@@ -1,0 +1,45 @@
+/*
+ * theme.css - how the terminal lays out ET Dictionary entries.
+ *
+ * minedict reads a `.css` beside a dictionary and honours the subset a
+ * terminal can show: display (block / inline / inline-block / none),
+ * visibility, color, font-weight, font-style, text-decoration,
+ * white-space, margin and padding (as blank lines and indent), ::before
+ * and ::after text, and CSS counters.
+ *
+ * ET Dictionary has no custom tags; its header StyleSheet turns the `N`
+ * markers into <font color="..."> runs, so the colours are the hooks.
+ * Each colour below is mapped onto the Dracula palette and given a role.
+ */
+
+/* 1  headword - the banner already shows it, so keep it as a quiet title */
+font[size="5"]                { display: block; font-weight: bold; color: #bd93f9; }
+
+/* 3, 4  pronunciation (KK; DJ) in the Kingsoft phonetic encoding */
+font[color="#FB8C42"]         { display: block; color: #6272a4; }
+
+/* 5  part of speech, e.g. <<名詞>> */
+font[color="#04A6B5"]         { display: block; margin-top: 1em; font-weight: bold; color: #ffb86c; }
+
+/* 6  inflections: caked, cak.ing, cakes */
+font[color="#9900CC"]         { display: block; font-style: italic; color: #6272a4; }
+
+/* 2  numbered senses */
+font[color="#0000FF"]         { display: block; color: #f8f8f2; }
+
+/* 11, 12  example phrases and sentences, each with its translation */
+font[color="#9933FF"],
+font[color="#F80AB8"]         { display: block; padding-left: 2em; font-style: italic; color: #8be9fd; }
+font[color="#9933FF"]::before,
+font[color="#F80AB8"]::before { content: "\21D2 "; color: #50fa7b; font-style: normal; }
+
+/* 7, 8  phrasal verbs and idioms, then their meaning */
+font[color="#F27A04"]         { display: block; margin-top: 1em; font-weight: bold; color: #ff79c6; }
+font[color="#330099"]         { display: block; color: #f8f8f2; }
+
+/* 9, 13  usage notes and cross references */
+font[color="#046AA4"],
+font[color="#4F86B4"]         { display: block; color: #8be9fd; }
+
+/* 10  quotations */
+font[color="#006699"]         { display: block; padding-left: 2em; font-style: italic; color: #6272a4; }

@@ -1,0 +1,17 @@
+# build output
+build/
+build-*/
+cmake-build-*/
+compile_commands.json
+
+# editors and operating systems
+.cache/
+.idea/
+.vscode/
+.DS_Store
+*~
+
+# dictionaries are big; only the example ships with the repository
+*.mdx
+*.mdd
+!examples/*.mdx
