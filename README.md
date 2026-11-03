@@ -39,7 +39,7 @@ and iconv (present on macOS and glibc systems) to decode Big5/GBK dictionaries.
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-ctest --test-dir build          # the unit tests (self-contained, no framework to download)
+ctest --test-dir build          # the unit tests
 ./build/bin/minedict -d examples cake
 ```
 
@@ -126,9 +126,7 @@ for (std::uint32_t position : index.exact("serendipity")) {
 ```
 
 `Archive` memory-maps the file, decodes every key when opened, and decodes
-record blocks on demand (verifying their checksums). The library depends on
-nothing but the C++ standard library (and iconv, when legacy code pages are
-wanted). `Index` answers exact,
+record blocks on demand (verifying their checksums). `Index` answers exact,
 prefix, substring and fuzzy queries. Everything that can fail returns
 `std::expected`; nothing throws across the API.
 
@@ -143,8 +141,8 @@ src/                    the program
 │   ├── index.hpp           exact / prefix / substring / fuzzy search
 │   ├── header.hpp          the UTF-16 XML header, StyleSheet, versions
 │   ├── compression.hpp     block envelope: tag, Adler-32, zlib / LZO / stored
-│   ├── inflate.hpp         built-in DEFLATE / zlib decoder
-│   ├── lzo.hpp             clean-room LZO1X decoder
+│   ├── inflate.hpp         DEFLATE / zlib decoder
+│   ├── lzo.hpp             LZO1X decoder
 │   ├── encoding.hpp        UTF-8, UTF-16LE natively; Big5/GBK through iconv
 │   ├── unicode.hpp         code point utilities and case folding
 │   ├── keys.hpp            headword normalisation, edit distance
@@ -158,8 +156,7 @@ src/                    the program
 │   └── options, terminal, presenter, repl, app
 ├── core/                   core implementation
 └── cli/                    front-end implementation and main.cpp
-tests/                  unit tests on a 150-line framework of our own (check.hpp),
-                        plus an in-memory MDX/MDD builder; run with ctest
+tests/                  unit tests (check.hpp) and an in-memory MDX/MDD builder; run with ctest
 ```
 
 ## The MDX format, briefly
@@ -205,6 +202,5 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-minedict has no third-party code: the zlib, LZO and RIPEMD-128 routines are
-its own. The example dictionary's content comes from the cdict-1.0.1 data; its
-terms are its own.
+The example dictionary's content comes from the cdict-1.0.1 data; its terms
+are its own.

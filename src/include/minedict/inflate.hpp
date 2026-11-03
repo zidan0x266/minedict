@@ -1,4 +1,4 @@
-// minedict - a built-in DEFLATE / zlib decoder (RFC 1950 and RFC 1951).
+// minedict - a DEFLATE / zlib decoder (RFC 1950 and RFC 1951).
 //
 // Engine 2.0 dictionaries compress every block with zlib. This decoder
 // handles stored, fixed-Huffman and dynamic-Huffman blocks, checks every

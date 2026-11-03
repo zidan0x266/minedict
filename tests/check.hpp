@@ -1,4 +1,4 @@
-// minedict - a small self-contained test framework (no third-party code).
+// minedict - a small test framework.
 //
 //   TEST(suite, name) { CHECK(x); CHECK_EQ(a, b); REQUIRE(ptr != nullptr); }
 //

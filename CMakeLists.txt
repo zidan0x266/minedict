@@ -5,7 +5,7 @@
 #
 # src/       the program: core reader + index (namespace minedict) and the
 #            terminal front end (namespace minedict::cli)
-# tests/     self-contained unit tests (no third-party framework)
+# tests/     unit tests
 # examples/  a toy dictionary and its terminal stylesheet
 cmake_minimum_required(VERSION 3.24)
 

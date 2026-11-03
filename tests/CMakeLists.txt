@@ -1,4 +1,4 @@
-# Unit tests, built on the tiny framework in check.hpp (no third-party code).
+# Unit tests, built on the small framework in check.hpp.
 # Each suite is one executable registered with CTest; run them all with
 # `ctest --test-dir build`, or one directly: `build/bin/test_archive [filter]`.
 add_library(minedict_check STATIC check.cpp)
