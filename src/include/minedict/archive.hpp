@@ -35,6 +35,11 @@ struct KeyEntry {
 struct OpenOptions {
   bool verify_checksums{true};
   std::size_t record_cache_blocks{8};
+  /// Decode the key blocks while opening. When false they are decoded on the
+  /// first call to `load_keys()`, which resource files rarely need.
+  bool decode_keys{true};
+  /// Worker threads for decoding key blocks (0 = one per hardware thread).
+  unsigned threads{0};
 };
 
 struct ArchiveStats {
@@ -63,12 +68,20 @@ class Archive {
   [[nodiscard]] const std::filesystem::path& path() const noexcept;
   [[nodiscard]] std::uint64_t file_size() const noexcept;
 
-  /// Every key in file order (the dictionary's own sort order).
+  /// Decode the key blocks if that has not happened yet (thread-safe, idempotent).
+  [[nodiscard]] Result<void> load_keys() const;
+  [[nodiscard]] bool keys_loaded() const noexcept;
+
+  /// Every key in file order (the dictionary's own sort order); empty until
+  /// the keys are loaded.
   [[nodiscard]] std::span<const KeyEntry> keys() const noexcept;
   [[nodiscard]] std::size_t size() const noexcept;
+  /// The entry count the file announces, available before the keys are decoded.
+  [[nodiscard]] std::uint64_t declared_entries() const noexcept;
 
   /// The raw bytes of the record for key `index`: binary data for an MDD,
-  /// text in the file's encoding (terminator included) for an MDX.
+  /// text in the file's encoding (terminator included) for an MDX. Loads the
+  /// keys first when needed.
   [[nodiscard]] Result<Bytes> record(std::size_t index) const;
 
   /// The record for key `index` as UTF-8 text with its terminator removed.

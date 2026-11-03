@@ -1,20 +1,63 @@
 #include "minedict/index.hpp"
 
 #include <algorithm>
+#include <future>
 #include <ranges>
 #include <set>
+#include <thread>
 #include <tuple>
 #include <utility>
 
 namespace minedict {
+namespace {
+
+constexpr std::size_t kParallelThreshold = 20'000;
+
+}  // namespace
 
 Index::Index(std::span<const KeyEntry> keys, KeyRules rules)
     : keys_(keys), rules_(rules), folded_rules_{.case_sensitive = false, .strip_punctuation = rules.strip_punctuation} {
-  items_.reserve(keys.size());
-  for (std::uint32_t position = 0; position < keys.size(); ++position) {
-    items_.push_back(Item{.folded = normalize_key(keys[position].text, folded_rules_), .position = position});
+  items_.resize(keys.size());
+  const auto fold_range = [&](std::size_t begin, std::size_t end) {
+    for (std::size_t position = begin; position < end; ++position) {
+      items_[position] = Item{.folded = normalize_key(keys[position].text, folded_rules_),
+                              .position = static_cast<std::uint32_t>(position)};
+    }
+    std::sort(items_.begin() + static_cast<std::ptrdiff_t>(begin), items_.begin() + static_cast<std::ptrdiff_t>(end),
+              [](const Item& a, const Item& b) { return std::tie(a.folded, a.position) < std::tie(b.folded, b.position); });
+  };
+
+  const unsigned workers = std::clamp(std::thread::hardware_concurrency(), 1U, 8U);
+  if (keys.size() < kParallelThreshold || workers == 1) {
+    fold_range(0, keys.size());
+    return;
   }
-  std::ranges::sort(items_, {}, [](const Item& item) { return std::tie(item.folded, item.position); });
+
+  // Fold and sort runs in parallel, then merge the sorted runs pairwise.
+  const std::size_t run = (keys.size() + workers - 1) / workers;
+  std::vector<std::size_t> bounds{0};
+  std::vector<std::future<void>> futures;
+  for (std::size_t begin = 0; begin < keys.size(); begin += run) {
+    const std::size_t end = std::min(begin + run, keys.size());
+    bounds.push_back(end);
+    futures.push_back(std::async(std::launch::async, fold_range, begin, end));
+  }
+  for (auto& future : futures) future.get();
+  const auto less = [](const Item& a, const Item& b) { return std::tie(a.folded, a.position) < std::tie(b.folded, b.position); };
+  while (bounds.size() > 2) {
+    std::vector<std::size_t> merged{0};
+    for (std::size_t i = 0; i + 1 < bounds.size(); i += 2) {
+      if (i + 2 < bounds.size()) {
+        std::inplace_merge(items_.begin() + static_cast<std::ptrdiff_t>(bounds[i]),
+                           items_.begin() + static_cast<std::ptrdiff_t>(bounds[i + 1]),
+                           items_.begin() + static_cast<std::ptrdiff_t>(bounds[i + 2]), less);
+        merged.push_back(bounds[i + 2]);
+      } else {
+        merged.push_back(bounds[i + 1]);
+      }
+    }
+    bounds = std::move(merged);
+  }
 }
 
 std::string Index::fold(std::string_view word) const { return normalize_key(word, folded_rules_); }

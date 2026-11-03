@@ -13,21 +13,19 @@ a front end (`minedict::cli`) built on top of it.
 $ minedict -d examples cake
 cake                                              Toy English-Chinese Dictionary
 ────────────────────────────────────────────────────────────────────────────────
-  cake
-  kek;keik
+  cake /keik/ ★★★ 中考 高考 CET-4 考研
 
-  <<名詞>>
-  1 蛋糕; 糕點
-  2 薄餅; 煎餅
-  3 炸酥塊
-  4 塊狀物
-  5 沉積物; 附著物
-  ⇒ a cake of grime in the oven
-  爐子裡有層污垢
+  释义
+  1. n. 蛋糕, 块, 饼
+  2. vt. 使结块, 加块状物于
+  3. vi. 结块
 
-  <<動詞>>
-  caked, cak.ing, cakes
-  ...
+  English
+  ⇒ n. a block of solid substance (such as soap or wax)
+  ⇒ n. baked goods made from or based on a mixture of flour, sugar, eggs, and
+  fat
+
+  词形 复数: cakes 过去分词: caked 现在分词: caking 过去式: caked
 ```
 
 ## Building
@@ -98,17 +96,17 @@ inline-block, none), `visibility`, `color`, `font-weight`, `font-style`,
 indent), `::before`/`::after` content, and CSS counters. That is what makes
 dictionaries built from custom tags (OALD, LDOCE, …) readable, and it is how
 [`examples/theme.css`](examples/theme.css) gives the toy dictionary its layout:
-each `<font color>` the header's stylesheet emits is turned into a block with
-a role. `--no-css` turns stylesheets off.
+numbered senses, labelled sections and inflected forms all come from a few
+class rules. `--no-css` turns stylesheets off.
 
 ## The example folder
 
-`examples/` holds `toy.mdx`, a small English–Chinese dictionary (about 3,000
-everyday words, the core vocabulary a learner's dictionary marks as essential,
-with entries excerpted from the ET Dictionary / cdict-1.0.1 data) written as an
-engine 2.0 file, and `theme.css`, its terminal stylesheet. The tests use the
-same file, so the suite covers a real dictionary as well as the engine 1.x and
-2.0 layouts it builds in memory.
+`examples/` holds `toy.mdx`, a small English–Chinese dictionary of about 3,500
+core words (Chinese and English glosses, pronunciation, inflections, exam
+tags) written as an engine 2.0 file, and `theme.css`, its terminal stylesheet.
+The entries are built from [ECDICT](https://github.com/skywind3000/ECDICT)
+(MIT License). The tests use the same file, so the suite covers a real
+dictionary as well as the engine 1.x and 2.0 layouts it builds in memory.
 
 ## Using the library
 
@@ -202,5 +200,5 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-The example dictionary's content comes from the cdict-1.0.1 data; its terms
-are its own.
+The example dictionary is built from [ECDICT](https://github.com/skywind3000/ECDICT),
+Copyright (c) Linwei, MIT License.

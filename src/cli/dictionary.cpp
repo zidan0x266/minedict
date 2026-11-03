@@ -6,6 +6,7 @@
 #include <format>
 #include <fstream>
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <utility>
@@ -39,12 +40,23 @@ std::string display_title(const Header& header, const std::filesystem::path& pat
 
 struct Dictionary::Impl {
   Archive archive;
-  Index index;
+  KeyRules rules;
   Metadata meta;
+  mutable std::once_flag index_once;
+  mutable std::optional<Index> index;
   mutable std::optional<css::Sheet> stylesheet;
   mutable std::vector<std::filesystem::path> stylesheet_files;
 
   explicit Impl(Archive opened) : archive(std::move(opened)) {}
+
+  /// Keys and index are decoded on first use; resource files usually never need them.
+  const Index& ensure_index() const {
+    std::call_once(index_once, [this] {
+      (void)archive.load_keys();  // a failure leaves an empty index; record() reports it
+      index.emplace(archive.keys(), rules);
+    });
+    return *index;
+  }
 
   [[nodiscard]] Result<std::string> definition(std::uint32_t position) const {
     if (position >= archive.size()) return fail(ErrorKind::invalid_argument, "key position out of range");
@@ -56,7 +68,7 @@ struct Dictionary::Impl {
   Result<void> resolve(std::string_view word, const LookupOptions& options, unsigned depth,
                        std::vector<std::string>& chain, std::set<std::string>& visited,
                        std::vector<Entry>& out) const {
-    for (const std::uint32_t position : index.exact(word)) {
+    for (const std::uint32_t position : ensure_index().exact(word)) {
       auto body = definition(position);
       if (!body) return std::unexpected(body.error());
       const std::string_view headword = archive.keys()[position].text;
@@ -91,18 +103,18 @@ Result<Dictionary> Dictionary::open(const std::filesystem::path& path) {
   if (!has_extension(path, ".mdx") && !has_extension(path, ".mdd")) {
     return fail(ErrorKind::unsupported, "{}: expected a .mdx or .mdd file", path.string());
   }
-  auto archive = Archive::open(path);
+  // Word dictionaries need their keys for every lookup; resource files only when a resource is asked for.
+  const bool mdx = has_extension(path, ".mdx");
+  auto archive = Archive::open(path, OpenOptions{.decode_keys = mdx});
   if (!archive) return std::unexpected(archive.error());
 
   auto impl = std::make_unique<Impl>(std::move(*archive));
   const Header& header = impl->archive.header();
-  const bool mdx = header.kind == Kind::mdx;
-  impl->index = Index{impl->archive.keys(),
-                      KeyRules{.case_sensitive = header.case_sensitive, .strip_punctuation = mdx && header.strip_key}};
+  impl->rules = KeyRules{.case_sensitive = header.case_sensitive, .strip_punctuation = mdx && header.strip_key};
   impl->meta = Metadata{.kind = header.kind,
                         .path = path,
                         .file_size = impl->archive.file_size(),
-                        .entries = impl->archive.size(),
+                        .entries = impl->archive.declared_entries(),
                         .title = display_title(header, path),
                         .header = header};
   return Dictionary{std::move(impl)};
@@ -110,11 +122,15 @@ Result<Dictionary> Dictionary::open(const std::filesystem::path& path) {
 
 const Metadata& Dictionary::metadata() const noexcept { return impl_->meta; }
 const Archive& Dictionary::archive() const noexcept { return impl_->archive; }
-const Index& Dictionary::index() const noexcept { return impl_->index; }
-KeyRules Dictionary::key_rules() const noexcept { return impl_->index.rules(); }
-std::size_t Dictionary::size() const noexcept { return impl_->archive.size(); }
+const Index& Dictionary::index() const { return impl_->ensure_index(); }
+KeyRules Dictionary::key_rules() const noexcept { return impl_->rules; }
+std::size_t Dictionary::size() const {
+  (void)impl_->ensure_index();
+  return impl_->archive.size();
+}
 
-KeyRef Dictionary::key_at(std::uint32_t position) const noexcept {
+KeyRef Dictionary::key_at(std::uint32_t position) const {
+  (void)impl_->ensure_index();
   const auto keys = impl_->archive.keys();
   if (position >= keys.size()) return {};
   return KeyRef{.key = keys[position].text, .position = position, .record_offset = keys[position].record_offset};
@@ -141,19 +157,19 @@ Result<std::vector<Entry>> Dictionary::lookup(std::string_view word, const Looku
 
 std::vector<KeyRef> Dictionary::find_prefix(std::string_view prefix, std::size_t limit) const {
   std::vector<KeyRef> out;
-  for (const std::uint32_t position : impl_->index.prefix(prefix, limit)) out.push_back(key_at(position));
+  for (const std::uint32_t position : impl_->ensure_index().prefix(prefix, limit)) out.push_back(key_at(position));
   return out;
 }
 
 std::vector<KeyRef> Dictionary::find_containing(std::string_view needle, std::size_t limit) const {
   std::vector<KeyRef> out;
-  for (const std::uint32_t position : impl_->index.containing(needle, limit)) out.push_back(key_at(position));
+  for (const std::uint32_t position : impl_->ensure_index().containing(needle, limit)) out.push_back(key_at(position));
   return out;
 }
 
 std::vector<Suggestion> Dictionary::suggest(std::string_view word, std::size_t limit, std::size_t max_distance) const {
   std::vector<Suggestion> out;
-  for (const FuzzyMatch& match : impl_->index.fuzzy(word, limit, max_distance)) {
+  for (const FuzzyMatch& match : impl_->ensure_index().fuzzy(word, limit, max_distance)) {
     out.push_back(Suggestion{.key = impl_->archive.keys()[match.position].text,
                              .distance = match.distance,
                              .position = match.position});
@@ -172,7 +188,7 @@ Result<std::vector<std::byte>> Dictionary::resource(std::string_view name) const
   if (!backslashed.starts_with('\\')) candidates.push_back("\\" + backslashed);
 
   for (const std::string& candidate : candidates) {
-    const auto positions = impl_->index.exact(candidate);
+    const auto positions = impl_->ensure_index().exact(candidate);
     if (positions.empty()) continue;
     return impl_->archive.record(positions.front());
   }

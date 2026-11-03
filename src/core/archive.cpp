@@ -1,8 +1,10 @@
 #include "minedict/archive.hpp"
 
 #include <algorithm>
+#include <future>
 #include <mutex>
 #include <optional>
+#include <thread>
 #include <utility>
 
 #include "minedict/checksum.hpp"
@@ -27,6 +29,7 @@ struct RecordBlock {
 
 struct KeyBlockInfo {
   std::uint64_t entries;
+  std::uint64_t compressed_offset;  // from the start of the key blocks
   std::uint64_t compressed_size;
   std::uint64_t decompressed_size;
 };
@@ -72,6 +75,54 @@ std::size_t find_terminator(ByteView data, std::size_t unit) noexcept {
   return data.size();
 }
 
+/// Keys decoded from a run of key blocks, by one worker.
+struct DecodedKeys {
+  std::vector<KeyEntry> keys;
+  std::array<std::size_t, 3> blocks_by_compression{};
+  std::vector<std::string> warnings;
+};
+
+Result<DecodedKeys> decode_key_blocks(std::span<const KeyBlockInfo> infos, ByteView blocks_raw, const Header& header,
+                                      std::size_t first_block_number, bool verify_checksums) {
+  auto decoder = Transcoder::open(header.encoding);
+  if (!decoder) return std::unexpected(decoder.error());
+  const NumberWidth width = header.number_width();
+  const auto number_bytes = static_cast<std::size_t>(width);
+  const std::size_t unit = header.encoding.unit_size();
+
+  DecodedKeys out;
+  std::size_t expected = 0;
+  for (const KeyBlockInfo& info : infos) expected += info.entries;
+  out.keys.reserve(expected);
+
+  std::size_t block_number = first_block_number;
+  for (const KeyBlockInfo& info : infos) {
+    const ByteView block = blocks_raw.subspan(info.compressed_offset, info.compressed_size);
+    auto parsed = parse_block(block);
+    if (!parsed) return fail(ErrorKind::format, "key block {}: {}", block_number, parsed.error().message);
+    out.blocks_by_compression[static_cast<std::size_t>(parsed->compression)]++;
+    auto data = unpack_block(block, info.decompressed_size, verify_checksums);
+    if (!data) return fail(ErrorKind::format, "key block {}: {}", block_number, data.error().message);
+
+    const ByteView view = *data;
+    std::size_t pos = 0;
+    while (pos < view.size()) {
+      if (pos + number_bytes > view.size()) {
+        out.warnings.push_back(std::format("key block {} ends with {} stray bytes", block_number, view.size() - pos));
+        break;
+      }
+      const std::uint64_t offset = read_be(view.subspan(pos, number_bytes));
+      pos += number_bytes;
+      const ByteView rest = view.subspan(pos);
+      const std::size_t end = find_terminator(rest, unit);
+      out.keys.push_back(KeyEntry{.text = decoder->to_utf8(rest.first(end)), .record_offset = offset});
+      pos += std::min(end + unit, rest.size());
+    }
+    ++block_number;
+  }
+  return out;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -80,24 +131,33 @@ struct Archive::Impl {
   MappedFile file;
   Header header;
   OpenOptions options;
-  std::vector<KeyEntry> keys;
-  std::vector<std::uint64_t> sorted_offsets;  // distinct record offsets, ascending
+
+  // Key section, parsed at open; the blocks themselves are decoded by load_keys().
+  std::vector<KeyBlockInfo> key_infos;
+  ByteView key_blocks_raw;
+  std::uint64_t declared_entries{0};
+  mutable std::mutex keys_mutex;
+  mutable bool keys_loaded{false};
+  mutable std::vector<KeyEntry> keys;
+  mutable std::vector<std::uint64_t> sorted_offsets;  // distinct record offsets, ascending
+
   std::vector<RecordBlock> blocks;
   std::uint64_t record_data_offset{0};
-  ArchiveStats stats;
-  std::vector<std::string> warnings;
+  mutable ArchiveStats stats;
+  mutable std::vector<std::string> warnings;
 
   struct CachedBlock {
     std::size_t index;
     Bytes data;
   };
-  mutable std::mutex mutex;
+  mutable std::mutex record_mutex;
   mutable std::vector<CachedBlock> cache;  // most recently used last
   mutable std::optional<Transcoder> transcoder;
 
   [[nodiscard]] Result<void> parse();
-  [[nodiscard]] Result<void> parse_keys(Reader& reader);
+  [[nodiscard]] Result<void> parse_key_section(Reader& reader);
   [[nodiscard]] Result<void> parse_record_index(Reader& reader);
+  [[nodiscard]] Result<void> load_keys() const;
   [[nodiscard]] Result<std::span<const std::byte>> decoded_block(std::size_t index) const;
   [[nodiscard]] Result<Bytes> record(std::size_t index) const;
 };
@@ -124,18 +184,19 @@ Result<void> Archive::Impl::parse() {
                 header.encoding.name);
   }
 
-  if (const auto status = parse_keys(reader); !status) return status;
+  if (const auto status = parse_key_section(reader); !status) return status;
   if (const auto status = parse_record_index(reader); !status) return status;
+  if (options.decode_keys) return load_keys();
   return {};
 }
 
-Result<void> Archive::Impl::parse_keys(Reader& reader) {
+Result<void> Archive::Impl::parse_key_section(Reader& reader) {
   const NumberWidth width = header.number_width();
   const bool v2 = header.is_v2();
   const std::size_t section_start = reader.position();
 
   const std::uint64_t block_count = reader.number(width);
-  const std::uint64_t entry_count = reader.number(width);
+  declared_entries = reader.number(width);
   const std::uint64_t index_decompressed_size = v2 ? reader.number(width) : 0;
   const std::uint64_t index_size = reader.number(width);
   const std::uint64_t blocks_size = reader.number(width);
@@ -147,7 +208,7 @@ Result<void> Archive::Impl::parse_keys(Reader& reader) {
     }
   }
   const ByteView index_raw = reader.take(index_size);
-  const ByteView blocks_raw = reader.take(blocks_size);
+  key_blocks_raw = reader.take(blocks_size);
   if (const auto status = reader.status(); !status) {
     return fail(ErrorKind::format, "key section: {}", status.error().message);
   }
@@ -164,78 +225,95 @@ Result<void> Archive::Impl::parse_keys(Reader& reader) {
     index_bytes.assign(index_raw.begin(), index_raw.end());
   }
 
-  std::vector<KeyBlockInfo> infos;
-  infos.reserve(block_count);
-  {
-    Reader index(index_bytes);
-    const std::size_t unit = header.encoding.unit_size();
-    const std::size_t terminator = v2 ? 1 : 0;  // 2.0 counts a terminator after each boundary key
-    std::uint64_t counted = 0;
-    for (std::uint64_t i = 0; i < block_count && index.ok(); ++i) {
-      KeyBlockInfo info{};
-      info.entries = index.number(width);
-      const std::size_t first_size = v2 ? index.u16() : index.u8();
-      index.skip((first_size + terminator) * unit);
-      const std::size_t last_size = v2 ? index.u16() : index.u8();
-      index.skip((last_size + terminator) * unit);
-      info.compressed_size = index.number(width);
-      info.decompressed_size = index.number(width);
-      counted += info.entries;
-      infos.push_back(info);
-    }
-    if (const auto status = index.status(); !status) {
-      return fail(ErrorKind::format, "key index: {}", status.error().message);
-    }
-    if (counted != entry_count) {
-      warnings.push_back(std::format("key index counts {} entries but the header says {}", counted, entry_count));
-    }
-  }
-
-  // The blocks themselves: (record offset, NUL-terminated key) pairs.
-  auto decoder = Transcoder::open(header.encoding);
-  if (!decoder) return std::unexpected(decoder.error());
+  Reader index(index_bytes);
   const std::size_t unit = header.encoding.unit_size();
-  keys.reserve(entry_count);
-  Reader key_blocks(blocks_raw);
-  for (const KeyBlockInfo& info : infos) {
-    const ByteView block = key_blocks.take(info.compressed_size);
-    if (!key_blocks.ok()) return fail(ErrorKind::format, "key blocks: {}", key_blocks.status().error().message);
-    auto parsed = parse_block(block);
-    if (!parsed) return fail(ErrorKind::format, "key block: {}", parsed.error().message);
-    stats.key_blocks_by_compression[static_cast<std::size_t>(parsed->compression)]++;
-    auto data = unpack_block(block, info.decompressed_size, options.verify_checksums);
-    if (!data) return fail(ErrorKind::format, "key block {}: {}", stats.key_blocks, data.error().message);
+  const std::size_t terminator = v2 ? 1 : 0;  // 2.0 counts a terminator after each boundary key
+  std::uint64_t counted = 0;
+  std::uint64_t compressed = 0;
+  key_infos.reserve(block_count);
+  for (std::uint64_t i = 0; i < block_count && index.ok(); ++i) {
+    KeyBlockInfo info{};
+    info.entries = index.number(width);
+    const std::size_t first_size = v2 ? index.u16() : index.u8();
+    index.skip((first_size + terminator) * unit);
+    const std::size_t last_size = v2 ? index.u16() : index.u8();
+    index.skip((last_size + terminator) * unit);
+    info.compressed_offset = compressed;
+    info.compressed_size = index.number(width);
+    info.decompressed_size = index.number(width);
+    compressed += info.compressed_size;
+    counted += info.entries;
+    key_infos.push_back(info);
+  }
+  if (const auto status = index.status(); !status) {
+    return fail(ErrorKind::format, "key index: {}", status.error().message);
+  }
+  if (compressed > key_blocks_raw.size()) {
+    return fail(ErrorKind::format, "key index describes {} bytes of blocks but only {} are present", compressed,
+                key_blocks_raw.size());
+  }
+  if (counted != declared_entries) {
+    warnings.push_back(std::format("key index counts {} entries but the header says {}", counted, declared_entries));
+  }
+  if (compressed < key_blocks_raw.size()) {
+    warnings.push_back(std::format("{} unused bytes after the key blocks", key_blocks_raw.size() - compressed));
+  }
+  stats.key_blocks = key_infos.size();
+  return {};
+}
 
-    const ByteView view = *data;
-    const auto number_bytes = static_cast<std::size_t>(width);
-    std::size_t pos = 0;
-    while (pos < view.size()) {
-      if (pos + number_bytes > view.size()) {
-        warnings.push_back(std::format("key block {} ends with {} stray bytes", stats.key_blocks, view.size() - pos));
-        break;
-      }
-      const std::uint64_t offset = read_be(view.subspan(pos, number_bytes));
-      pos += number_bytes;
-      const ByteView rest = view.subspan(pos);
-      const std::size_t end = find_terminator(rest, unit);
-      keys.push_back(KeyEntry{.text = decoder->to_utf8(rest.first(end)), .record_offset = offset});
-      pos += std::min(end + unit, rest.size());
+Result<void> Archive::Impl::load_keys() const {
+  std::lock_guard lock(keys_mutex);
+  if (keys_loaded) return {};
+
+  // Split the blocks among workers; each decodes its run independently.
+  unsigned workers = options.threads != 0 ? options.threads : std::thread::hardware_concurrency();
+  workers = std::clamp(workers, 1U, 16U);
+  if (key_infos.size() < 8) workers = 1;
+  const std::size_t per_worker = (key_infos.size() + workers - 1) / workers;
+
+  std::vector<std::future<Result<DecodedKeys>>> futures;
+  for (std::size_t start = 0; start < key_infos.size(); start += per_worker) {
+    const std::size_t count = std::min(per_worker, key_infos.size() - start);
+    const std::span<const KeyBlockInfo> run{key_infos.data() + start, count};
+    if (workers == 1) {
+      std::promise<Result<DecodedKeys>> ready;
+      ready.set_value(decode_key_blocks(run, key_blocks_raw, header, start, options.verify_checksums));
+      futures.push_back(ready.get_future());
+    } else {
+      futures.push_back(std::async(std::launch::async, decode_key_blocks, run, key_blocks_raw, std::cref(header),
+                                   start, options.verify_checksums));
     }
-    stats.key_blocks++;
   }
-  if (!key_blocks.done()) {
-    warnings.push_back(std::format("{} unused bytes after the key blocks", key_blocks.remaining()));
-  }
-  if (keys.size() != entry_count) {
-    warnings.push_back(std::format("decoded {} keys but the header announces {}", keys.size(), entry_count));
-  }
-  if (keys.empty()) return fail(ErrorKind::format, "the dictionary has no keys");
 
-  sorted_offsets.reserve(keys.size());
-  for (const KeyEntry& key : keys) sorted_offsets.push_back(key.record_offset);
+  std::vector<KeyEntry> decoded;
+  decoded.reserve(declared_entries);
+  std::optional<Error> failure;
+  for (auto& future : futures) {
+    auto chunk = future.get();
+    if (!chunk) {
+      if (!failure) failure = chunk.error();
+      continue;
+    }
+    decoded.insert(decoded.end(), std::make_move_iterator(chunk->keys.begin()), std::make_move_iterator(chunk->keys.end()));
+    for (std::size_t i = 0; i < chunk->blocks_by_compression.size(); ++i) {
+      stats.key_blocks_by_compression[i] += chunk->blocks_by_compression[i];
+    }
+    warnings.insert(warnings.end(), chunk->warnings.begin(), chunk->warnings.end());
+  }
+  if (failure) return std::unexpected(*failure);
+  if (decoded.size() != declared_entries) {
+    warnings.push_back(std::format("decoded {} keys but the header announces {}", decoded.size(), declared_entries));
+  }
+  if (decoded.empty()) return fail(ErrorKind::format, "the dictionary has no keys");
+
+  sorted_offsets.reserve(decoded.size());
+  for (const KeyEntry& key : decoded) sorted_offsets.push_back(key.record_offset);
   std::ranges::sort(sorted_offsets);
   const auto [first, last] = std::ranges::unique(sorted_offsets);
   sorted_offsets.erase(first, last);
+  keys = std::move(decoded);
+  keys_loaded = true;
   return {};
 }
 
@@ -249,8 +327,8 @@ Result<void> Archive::Impl::parse_record_index(Reader& reader) {
   if (const auto status = reader.status(); !status) {
     return fail(ErrorKind::format, "record section: {}", status.error().message);
   }
-  if (entry_count != keys.size()) {
-    warnings.push_back(std::format("record section counts {} entries, key section {}", entry_count, keys.size()));
+  if (entry_count != declared_entries) {
+    warnings.push_back(std::format("record section counts {} entries, key section {}", entry_count, declared_entries));
   }
 
   Reader index(index_raw);
@@ -288,7 +366,7 @@ Result<void> Archive::Impl::parse_record_index(Reader& reader) {
 }
 
 Result<std::span<const std::byte>> Archive::Impl::decoded_block(std::size_t index) const {
-  // Caller holds `mutex`.
+  // Caller holds `record_mutex`.
   if (const auto hit = std::ranges::find(cache, index, &CachedBlock::index); hit != cache.end()) {
     std::rotate(hit, hit + 1, cache.end());  // move to the back = most recent
     return ByteView{cache.back().data};
@@ -297,17 +375,13 @@ Result<std::span<const std::byte>> Archive::Impl::decoded_block(std::size_t inde
   const ByteView raw = file.view().subspan(record_data_offset + block.compressed_offset, block.compressed_size);
   auto data = unpack_block(raw, block.decompressed_size, options.verify_checksums);
   if (!data) return fail(ErrorKind::format, "record block {}: {}", index, data.error().message);
-  if (options.record_cache_blocks == 0) {
-    cache.clear();
-    cache.push_back(CachedBlock{.index = index, .data = std::move(*data)});
-  } else {
-    if (cache.size() >= options.record_cache_blocks) cache.erase(cache.begin());
-    cache.push_back(CachedBlock{.index = index, .data = std::move(*data)});
-  }
+  if (!cache.empty() && cache.size() >= std::max<std::size_t>(options.record_cache_blocks, 1)) cache.erase(cache.begin());
+  cache.push_back(CachedBlock{.index = index, .data = std::move(*data)});
   return ByteView{cache.back().data};
 }
 
 Result<Bytes> Archive::Impl::record(std::size_t index) const {
+  if (const auto status = load_keys(); !status) return std::unexpected(status.error());
   if (index >= keys.size()) return fail(ErrorKind::invalid_argument, "key position {} is out of range", index);
   const KeyEntry& entry = keys[index];
 
@@ -327,7 +401,7 @@ Result<Bytes> Archive::Impl::record(std::size_t index) const {
     end = *next;
   }
 
-  std::lock_guard lock(mutex);
+  std::lock_guard lock(record_mutex);
   auto data = decoded_block(static_cast<std::size_t>(block_it - blocks.begin()));
   if (!data) return std::unexpected(data.error());
   const std::size_t start = static_cast<std::size_t>(entry.record_offset - block.decompressed_offset);
@@ -377,8 +451,22 @@ const Header& Archive::header() const noexcept { return impl_->header; }
 Kind Archive::kind() const noexcept { return impl_->header.kind; }
 const std::filesystem::path& Archive::path() const noexcept { return impl_->file.path(); }
 std::uint64_t Archive::file_size() const noexcept { return impl_->file.size(); }
+
+Result<void> Archive::load_keys() const {
+  if (const auto status = impl_->load_keys(); !status) {
+    return fail(status.error().kind, "{}: {}", impl_->file.path().string(), status.error().message);
+  }
+  return {};
+}
+
+bool Archive::keys_loaded() const noexcept {
+  std::lock_guard lock(impl_->keys_mutex);
+  return impl_->keys_loaded;
+}
+
 std::span<const KeyEntry> Archive::keys() const noexcept { return impl_->keys; }
 std::size_t Archive::size() const noexcept { return impl_->keys.size(); }
+std::uint64_t Archive::declared_entries() const noexcept { return impl_->declared_entries; }
 const ArchiveStats& Archive::stats() const noexcept { return impl_->stats; }
 std::span<const std::string> Archive::warnings() const noexcept { return impl_->warnings; }
 
@@ -396,7 +484,7 @@ Result<std::string> Archive::text(std::size_t index) const {
                        [](std::byte b) { return b == std::byte{0}; });
   };
   while (is_null_unit()) bytes->resize(bytes->size() - unit);
-  std::lock_guard lock(impl_->mutex);
+  std::lock_guard lock(impl_->record_mutex);
   if (!impl_->transcoder) {
     auto transcoder = Transcoder::open(impl_->header.encoding);
     if (!transcoder) return std::unexpected(transcoder.error());

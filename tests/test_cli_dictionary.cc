@@ -143,7 +143,7 @@ TEST(dictionary, example_dictionary_end_to_end) {
   REQUIRE(cake.has_value());
   REQUIRE_EQ(cake->size(), 1U);
   CHECK_EQ((*cake)[0].headword, "cake");
-  CHECK((*cake)[0].definition.starts_with("<font color=\"#FF0000\" size=5>cake</font>"));
+  CHECK((*cake)[0].definition.starts_with("<div class=\"entry\">"));
   CHECK((*cake)[0].definition.contains("蛋糕"));
   CHECK_EQ(d.lookup("CAKE").value()[0].definition, (*cake)[0].definition);
 

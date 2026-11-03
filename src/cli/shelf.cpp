@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <format>
 #include <fstream>
+#include <future>
 #include <set>
 
 #include "minedict/cli/terminal.hpp"
@@ -43,9 +44,18 @@ Result<void> Shelf::add(const std::filesystem::path& path) {
     std::ranges::sort(files, {}, [](const std::filesystem::path& file) {
       return std::pair(!has_extension(file, ".mdx"), file.filename().string());
     });
-    std::vector<std::string> failures;
+    std::vector<std::future<Result<Dictionary>>> opening;
     for (const auto& file : files) {
-      if (const auto status = add(file); !status) failures.push_back(status.error().message);
+      opening.push_back(std::async(std::launch::async, [file] { return Dictionary::open(file); }));
+    }
+    std::vector<std::string> failures;
+    for (auto& future : opening) {
+      auto dictionary = future.get();
+      if (!dictionary) {
+        failures.push_back(dictionary.error().message);
+        continue;
+      }
+      dictionaries_.push_back(std::make_unique<Dictionary>(std::move(*dictionary)));
     }
     if (failures.size() == files.size()) {
       return fail(ErrorKind::format, failures.front());

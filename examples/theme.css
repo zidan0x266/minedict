@@ -1,5 +1,5 @@
 /*
- * theme.css - how the terminal lays out ET Dictionary entries.
+ * theme.css - how the terminal lays out the toy dictionary's entries.
  *
  * minedict reads a `.css` beside a dictionary and honours the subset a
  * terminal can show: display (block / inline / inline-block / none),
@@ -7,39 +7,40 @@
  * white-space, margin and padding (as blank lines and indent), ::before
  * and ::after text, and CSS counters.
  *
- * ET Dictionary has no custom tags; its header StyleSheet turns the `N`
- * markers into <font color="..."> runs, so the colours are the hooks.
- * Each colour below is mapped onto the Dracula palette and given a role.
+ * Entries look like this:
+ *
+ *   <div class="entry">
+ *     <div class="head"><span class="hw">cake</span> <span class="phon">/keik/</span>
+ *                       <span class="tags">★★★ 中考 高考</span></div>
+ *     <div class="zh"><div class="sense">n. 蛋糕, 块, 饼</div> ...</div>
+ *     <div class="en"><div class="def">n. a block of solid substance ...</div> ...</div>
+ *     <div class="forms"><span class="form"><span class="label">复数</span> cakes</span> ...</div>
+ *   </div>
  */
 
-/* 1  headword - the banner already shows it, so keep it as a quiet title */
-font[size="5"]                { display: block; font-weight: bold; color: #bd93f9; }
+.entry             { counter-reset: sense; }
 
-/* 3, 4  pronunciation (KK; DJ) in the Kingsoft phonetic encoding */
-font[color="#FB8C42"]         { display: block; color: #6272a4; }
+/* headword line: the banner already names the word, so keep it quiet */
+.head              { display: block; }
+.hw                { font-weight: bold; color: #bd93f9; }
+.phon              { color: #6272a4; }
+.tags              { color: #ffb86c; }
 
-/* 5  part of speech, e.g. <<名詞>> */
-font[color="#04A6B5"]         { display: block; margin-top: 1em; font-weight: bold; color: #ffb86c; }
+/* Chinese senses, numbered with a CSS counter */
+.zh                { display: block; margin-top: 1em; }
+.zh::before        { content: "释义"; display: block; font-weight: bold; color: #ffb86c; }
+.zh .sense         { display: block; counter-increment: sense; color: #f8f8f2; }
+.zh .sense::before { content: counter(sense) ". "; color: #8be9fd; }
 
-/* 6  inflections: caked, cak.ing, cakes */
-font[color="#9900CC"]         { display: block; font-style: italic; color: #6272a4; }
+/* English definitions */
+.en                { display: block; margin-top: 1em; }
+.en::before        { content: "English"; display: block; font-weight: bold; color: #ffb86c; }
+.en .def           { display: block; padding-left: 2em; font-style: italic; color: #8be9fd; }
+.en .def::before   { content: "\21D2 "; color: #50fa7b; font-style: normal; }
 
-/* 2  numbered senses */
-font[color="#0000FF"]         { display: block; color: #f8f8f2; }
-
-/* 11, 12  example phrases and sentences, each with its translation */
-font[color="#9933FF"],
-font[color="#F80AB8"]         { display: block; padding-left: 2em; font-style: italic; color: #8be9fd; }
-font[color="#9933FF"]::before,
-font[color="#F80AB8"]::before { content: "\21D2 "; color: #50fa7b; font-style: normal; }
-
-/* 7, 8  phrasal verbs and idioms, then their meaning */
-font[color="#F27A04"]         { display: block; margin-top: 1em; font-weight: bold; color: #ff79c6; }
-font[color="#330099"]         { display: block; color: #f8f8f2; }
-
-/* 9, 13  usage notes and cross references */
-font[color="#046AA4"],
-font[color="#4F86B4"]         { display: block; color: #8be9fd; }
-
-/* 10  quotations */
-font[color="#006699"]         { display: block; padding-left: 2em; font-style: italic; color: #6272a4; }
+/* inflected forms */
+.forms             { display: block; margin-top: 1em; color: #6272a4; }
+.forms::before     { content: "词形 "; font-weight: bold; color: #ffb86c; }
+.form              { display: inline-block; }
+.form .label       { font-style: italic; }
+.form .label::after { content: ":"; }

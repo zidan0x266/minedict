@@ -64,12 +64,13 @@ class Dictionary {
 
   [[nodiscard]] const Metadata& metadata() const noexcept;
   [[nodiscard]] const Archive& archive() const noexcept;
-  [[nodiscard]] const Index& index() const noexcept;
+  /// The search index, built on first use.
+  [[nodiscard]] const Index& index() const;
   [[nodiscard]] KeyRules key_rules() const noexcept;
 
   /// Number of headwords, duplicates included.
-  [[nodiscard]] std::size_t size() const noexcept;
-  [[nodiscard]] KeyRef key_at(std::uint32_t position) const noexcept;
+  [[nodiscard]] std::size_t size() const;
+  [[nodiscard]] KeyRef key_at(std::uint32_t position) const;
 
   /// The definition HTML stored for a headword position, with the header's
   /// `StyleSheet` markers expanded.
