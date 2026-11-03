@@ -17,22 +17,22 @@ set_target_properties(minedict_core PROPERTIES OUTPUT_NAME minedict EXPORT_NAME 
 
 target_sources(minedict_core PUBLIC
     FILE_SET HEADERS
-    BASE_DIRS "${PROJECT_SOURCE_DIR}/include"
+    BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../include"
     FILES
-        "${PROJECT_SOURCE_DIR}/include/minedict/archive.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/bytes.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/checksum.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/compression.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/encoding.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/error.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/header.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/index.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/inflate.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/keys.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/lzo.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/mapped_file.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/ripemd128.hpp"
-        "${PROJECT_SOURCE_DIR}/include/minedict/unicode.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/archive.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/bytes.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/checksum.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/compression.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/encoding.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/error.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/header.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/index.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/inflate.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/keys.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/lzo.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/mapped_file.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/ripemd128.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/minedict/unicode.hpp"
 )
 target_include_directories(minedict_core PUBLIC
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>

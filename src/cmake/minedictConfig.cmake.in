@@ -1,7 +1,0 @@
-@PACKAGE_INIT@
-include(CMakeFindDependencyMacro)
-if(@MINEDICT_WITH_ICONV@)
-    find_dependency(Iconv)
-endif()
-include("${CMAKE_CURRENT_LIST_DIR}/minedictTargets.cmake")
-check_required_components(minedict)

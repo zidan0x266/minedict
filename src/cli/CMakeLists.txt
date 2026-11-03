@@ -15,7 +15,7 @@ add_library(minedict_cli STATIC
     theme.cpp
 )
 add_library(minedict::cli ALIAS minedict_cli)
-target_include_directories(minedict_cli PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_include_directories(minedict_cli PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 target_link_libraries(minedict_cli PUBLIC minedict::core PRIVATE $<BUILD_INTERFACE:minedict::warnings>)
 target_compile_features(minedict_cli PUBLIC cxx_std_23)
 

@@ -11,7 +11,7 @@ a front end (`minedict::cli`) built on top of it.
 
 ```
 $ minedict -d examples cake
-cake                                                              ET Dictionary
+cake                                              Toy English-Chinese Dictionary
 ────────────────────────────────────────────────────────────────────────────────
   cake
   kek;keik
@@ -37,12 +37,14 @@ or Xcode 15.3+. Optional: GNU readline or libedit for the interactive mode,
 and iconv (present on macOS and glibc systems) to decode Big5/GBK dictionaries.
 
 ```bash
-cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
+ctest --test-dir build          # the unit tests (self-contained, no framework to download)
 ./build/bin/minedict -d examples cake
 ```
 
-CMake options: `-DMINEDICT_BUILD_CLI=OFF` (library only), `-DMINEDICT_WITH_READLINE=OFF`, `-DMINEDICT_WITH_ICONV=OFF`,
+CMake options: `-DMINEDICT_BUILD_CLI=OFF` (library only), `-DMINEDICT_BUILD_TESTS=OFF`,
+`-DMINEDICT_WITH_READLINE=OFF`, `-DMINEDICT_WITH_ICONV=OFF`,
 `-DMINEDICT_WARNINGS_AS_ERRORS=ON`. `cmake --install build` installs the
 executable, the core library, its headers and a CMake package
 (`find_package(minedict)` then link `minedict::core`).
@@ -95,15 +97,18 @@ inline-block, none), `visibility`, `color`, `font-weight`, `font-style`,
 `text-decoration`, `white-space`, `margin`/`padding` (as blank lines and
 indent), `::before`/`::after` content, and CSS counters. That is what makes
 dictionaries built from custom tags (OALD, LDOCE, …) readable, and it is how
-[`examples/theme.css`](examples/theme.css) gives ET Dictionary its layout:
+[`examples/theme.css`](examples/theme.css) gives the toy dictionary its layout:
 each `<font color>` the header's stylesheet emits is turned into a block with
 a role. `--no-css` turns stylesheets off.
 
 ## The example folder
 
-`examples/` holds `ETDict.mdx`, an English–Chinese dictionary converted from
-the cdict-1.0.1 data (engine 1.2, LZO blocks, Big5 text), and `theme.css`,
-its terminal stylesheet.
+`examples/` holds `toy.mdx`, a small English–Chinese dictionary (about 3,000
+everyday words, the core vocabulary a learner's dictionary marks as essential,
+with entries excerpted from the ET Dictionary / cdict-1.0.1 data) written as an
+engine 2.0 file, and `theme.css`, its terminal stylesheet. The tests use the
+same file, so the suite covers a real dictionary as well as the engine 1.x and
+2.0 layouts it builds in memory.
 
 ## Using the library
 
@@ -130,9 +135,9 @@ prefix, substring and fuzzy queries. Everything that can fail returns
 ## Code layout
 
 ```
-src/
-├── CMakeLists.txt          project root for CMake (cmake -S src -B build)
-├── cmake/                  toolchain check, warning set, package config
+CMakeLists.txt          the project (cmake -S . -B build)
+examples/               toy.mdx and theme.css
+src/                    the program
 ├── include/minedict/       core headers (namespace minedict)
 │   ├── archive.hpp         one MDX/MDD file: header, keys, lazy records
 │   ├── index.hpp           exact / prefix / substring / fuzzy search
@@ -153,6 +158,8 @@ src/
 │   └── options, terminal, presenter, repl, app
 ├── core/                   core implementation
 └── cli/                    front-end implementation and main.cpp
+tests/                  unit tests on a 150-line framework of our own (check.hpp),
+                        plus an in-memory MDX/MDD builder; run with ctest
 ```
 
 ## The MDX format, briefly
