@@ -359,7 +359,7 @@ Sheet Sheet::parse(std::string_view source) {
       Rule rule;
       rule.declarations = declarations;
 
-      // Pseudo-elements we understand; any other pseudo makes the rule inert.
+      // Supported pseudo-elements; any other pseudo makes the rule inert.
       for (const auto [suffix, pseudo] : {std::pair{std::string_view{"::before"}, Pseudo::before},
                                           std::pair{std::string_view{":before"}, Pseudo::before},
                                           std::pair{std::string_view{"::after"}, Pseudo::after},

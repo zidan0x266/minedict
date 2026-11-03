@@ -17,7 +17,7 @@ class Decoder {
     if (in_.size() < 3) return Status::input_overrun;
 
     std::size_t bitstream_version = 0;
-    if (in_.size() >= 5 && byte_at(0) == 17) {  // kernel-style versioned stream
+    if (in_.size() >= 5 && byte_at(0) == 17) {  // versioned stream: a version byte follows
       bitstream_version = byte_at(1);
       ip_ = 2;
     }

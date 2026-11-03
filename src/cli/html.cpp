@@ -63,7 +63,7 @@ std::optional<std::pair<Tag, std::size_t>> parse_tag(std::string_view s, std::si
       continue;
     }
     if (s[i] == '<') {
-      // Unterminated tag; treat what we have as complete.
+      // Unterminated tag; treat the text so far as complete.
       return std::pair{std::move(tag), i};
     }
     // attribute name

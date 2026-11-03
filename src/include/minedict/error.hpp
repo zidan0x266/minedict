@@ -17,7 +17,7 @@ enum class ErrorKind {
   not_found,         // no such key, file or resource
   io,                // the operating system refused
   format,            // the file is not a well-formed MDX/MDD
-  unsupported,       // valid, but a feature we do not implement (yet)
+  unsupported,       // valid, but not supported
   internal,
 };
 

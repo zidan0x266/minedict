@@ -75,7 +75,7 @@ std::vector<FuzzyMatch> Index::fuzzy(std::string_view word, std::size_t limit, s
   if (folded.empty()) return found;
   std::set<std::string_view> seen;
   for (const Item& item : items_) {
-    // A cheap byte-length filter before the real distance (UTF-8 is at most 4 bytes per code point).
+    // A byte-length filter before the real distance (UTF-8 is at most 4 bytes per code point).
     if (item.folded.size() + max_distance * 4 < folded.size() || folded.size() + max_distance * 4 < item.folded.size()) {
       continue;
     }

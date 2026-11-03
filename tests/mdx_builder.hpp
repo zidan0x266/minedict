@@ -1,7 +1,6 @@
 // Test helper: builds small MDX/MDD files in memory so the reader can be
 // exercised against every layout variant without shipping binary fixtures.
-// zlib blocks are written with our own tiny encoder (stored or fixed-Huffman
-// literal blocks), which is enough to drive every branch of the decoder.
+// zlib blocks are written as stored or fixed-Huffman literal blocks.
 #pragma once
 
 #include <algorithm>
@@ -78,7 +77,7 @@ inline Bytes encode_text(std::string_view utf8, bool utf16) {
   return Bytes(bytes.begin(), bytes.end());
 }
 
-/// LSB-first bit writer for the tiny DEFLATE encoder below.
+/// LSB-first bit writer for the DEFLATE encoder below.
 class BitWriter {
  public:
   void put(std::uint32_t value, unsigned count) {

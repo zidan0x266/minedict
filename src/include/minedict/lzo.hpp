@@ -1,9 +1,7 @@
 // minedict - an LZO1X decompressor.
 //
-// MDict engine 1.x stores its blocks with LZO1X. The bitstream is documented
-// (see the Linux kernel's Documentation/staging/lzo.rst); this decoder
-// follows that description and checks every bound, so corrupt input yields
-// an error rather than a crash.
+// MDict engine 1.x stores its blocks with LZO1X. Every bound is checked, so
+// corrupt input yields an error rather than a crash.
 #pragma once
 
 #include <cstddef>

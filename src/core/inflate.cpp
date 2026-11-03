@@ -103,7 +103,7 @@ class Huffman {
     for (const std::uint8_t length : lengths) count_[length]++;
     count_[0] = 0;
 
-    // Reject over-subscribed codes; incomplete ones are allowed (zlib does the same).
+    // Reject over-subscribed codes; incomplete ones are allowed.
     int left = 1;
     for (unsigned len = 1; len <= kMaxBits; ++len) {
       left <<= 1;

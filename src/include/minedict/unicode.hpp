@@ -69,7 +69,7 @@ void append_utf8(std::string& out, char32_t code_point);
 }
 
 /// Lower-case a letter from the Latin, Greek or Cyrillic blocks; anything
-/// else is returned unchanged. Deliberately simple and table-free.
+/// else is returned unchanged.
 [[nodiscard]] constexpr char32_t fold_case(char32_t cp) noexcept {
   if (cp >= 0x41 && cp <= 0x5A) return cp + 32;  // A-Z
   if (cp < 0x80) return cp;

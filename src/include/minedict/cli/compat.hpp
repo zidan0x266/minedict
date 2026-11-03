@@ -1,8 +1,7 @@
 // minedict - BSD 3-Clause License; see README.
 //
-// Thin shims so the CLI can lean on the newest standard-library facilities
-// where they exist (libc++ 17+, libstdc++ 14+) and degrade gracefully on
-// slightly older toolchains that already have <format> and <expected>.
+// Printing helpers: std::print where the standard library provides it,
+// std::format plus fwrite otherwise.
 #pragma once
 
 #include <version>

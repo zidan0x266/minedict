@@ -121,7 +121,7 @@ std::string Transcoder::to_utf8(ByteView bytes) {
   const auto handle = static_cast<iconv_t>(handle_);
   iconv(handle, nullptr, nullptr, nullptr, nullptr);  // reset shift state
 
-  // iconv wants a non-const char**; we never write through it.
+  // iconv takes a non-const char**; nothing is written through it.
   char* in = const_cast<char*>(reinterpret_cast<const char*>(bytes.data()));
   std::size_t in_left = bytes.size();
   while (in_left > 0) {

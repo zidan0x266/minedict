@@ -43,7 +43,7 @@ struct Frame {
 };
 
 /// ASCII whitespace plus the typographic spaces (en, em, thin, ...); the
-/// no-break space is deliberately not included.
+/// no-break space is not included.
 constexpr bool is_collapsible_space(char32_t cp) noexcept {
   return cp == U' ' || cp == U'\t' || cp == U'\n' || cp == U'\r' || cp == U'\f' || cp == U'\v' ||
          (cp >= 0x2000 && cp <= 0x200A) || cp == 0x202F || cp == 0x205F || cp == 0x3000;
