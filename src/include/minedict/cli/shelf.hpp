@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <memory>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,8 +38,13 @@ class Shelf {
     Suggestion suggestion;
   };
 
-  /// Open a dictionary file, or every `.mdx` inside a directory.
+  /// Open a dictionary file, or every `.mdx` inside a directory. Files in a
+  /// directory that fail to open are recorded in `problems()`; the call
+  /// itself fails only when nothing could be opened.
   [[nodiscard]] Result<void> add(const std::filesystem::path& path);
+
+  /// Messages for the files `add` skipped.
+  [[nodiscard]] std::span<const std::string> problems() const noexcept { return problems_; }
 
   [[nodiscard]] auto dictionaries() const noexcept {
     return dictionaries_ | std::views::transform([](const auto& owned) -> const Dictionary& { return *owned; });
@@ -60,6 +66,7 @@ class Shelf {
 
  private:
   std::vector<std::unique_ptr<Dictionary>> dictionaries_;
+  std::vector<std::string> problems_;
 };
 
 }  // namespace minedict::cli

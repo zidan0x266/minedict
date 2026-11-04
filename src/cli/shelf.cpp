@@ -5,6 +5,7 @@
 #include <format>
 #include <fstream>
 #include <future>
+#include <iterator>
 #include <set>
 
 #include "minedict/cli/terminal.hpp"
@@ -60,6 +61,8 @@ Result<void> Shelf::add(const std::filesystem::path& path) {
     if (failures.size() == files.size()) {
       return fail(ErrorKind::format, failures.front());
     }
+    problems_.insert(problems_.end(), std::make_move_iterator(failures.begin()),
+                     std::make_move_iterator(failures.end()));
     return {};
   }
 

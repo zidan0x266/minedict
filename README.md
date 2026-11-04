@@ -6,8 +6,9 @@ A terminal dictionary for MDX/MDD files, written in C++23.
 their `.mdd` resource files), indexes every headword, and renders entries in
 the terminal with the [Dracula](https://draculatheme.com) palette: block
 layout, lists, tables, super/subscripts, redirects, and the dictionary's own
-CSS. It ships as a small library (`minedict::core`, the reader and index) and
-a front end (`minedict::cli`) built on top of it.
+CSS. It ships as a small library (`minedict::core`, the reader and index), a
+front end (`minedict::cli`) built on top of it, and on macOS a native app
+(see [The macOS app](#the-macos-app)).
 
 ```
 $ minedict -d examples cake
@@ -42,8 +43,8 @@ ctest --test-dir build          # the unit tests
 ```
 
 CMake options: `-DMINEDICT_BUILD_CLI=OFF` (library only), `-DMINEDICT_BUILD_TESTS=OFF`,
-`-DMINEDICT_WITH_READLINE=OFF`, `-DMINEDICT_WITH_ICONV=OFF`,
-`-DMINEDICT_WARNINGS_AS_ERRORS=ON`. `cmake --install build` installs the
+`-DMINEDICT_BUILD_MACOS=ON` (the app below), `-DMINEDICT_WITH_READLINE=OFF`,
+`-DMINEDICT_WITH_ICONV=OFF`, `-DMINEDICT_WARNINGS_AS_ERRORS=ON`. `cmake --install build` installs the
 executable, the core library, its headers and a CMake package
 (`find_package(minedict)` then link `minedict::core`).
 
@@ -108,6 +109,37 @@ The entries are built from [ECDICT](https://github.com/skywind3000/ECDICT)
 (MIT License). The tests use the same file, so the suite covers a real
 dictionary as well as the engine 1.x and 2.0 layouts it builds in memory.
 
+## The macOS app
+
+`macos/` holds Minedict.app, a SwiftUI front end over the same library: a
+search field with live headword matches, the entry in a web view styled by
+the dictionary's own CSS, pictures and sounds served from the `.mdd` files,
+`entry://` links and `@@@LINK=` redirects that stay inside the app, and a
+back/forward history. It needs macOS 14 or newer and builds with the Command
+Line Tools alone:
+
+```bash
+cmake -S . -B build -DMINEDICT_BUILD_MACOS=ON
+cmake --build build
+open build/bin/Minedict.app --args --dictionary "$PWD/examples" --lookup cake
+```
+
+Open dictionaries with File ▸ Open Dictionary… (files or a whole folder) or
+drop them on the window; the choice is kept between launches. Without one,
+the app reads the same `MINEDICT_DICTS` and `~/.config/minedict/dictionaries`
+as the terminal program. The View menu switches the entry canvas between
+light (the default, which dictionary stylesheets expect), dark and the system
+appearance, matches anywhere in headwords instead of by prefix, and sets the
+text size. `--dictionary <path>` opens a file or folder for one launch and
+`--lookup <word>` shows a word right away. `cmake --install build --prefix ~`
+puts the app in `~/Applications`; configure with
+`-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0` to build one that runs on systems older
+than the build machine.
+
+The app reaches the library through `macos/Bridge`, three Objective-C classes
+(`MDShelf`, `MDDictionary`, `MDEntry`) over `minedict::cli`, so it opens
+whatever the terminal program opens; `tests/test_bridge.mm` covers them.
+
 ## Using the library
 
 ```cpp
@@ -155,6 +187,7 @@ src/                    the program
 ├── core/                   core implementation
 └── cli/                    front-end implementation and main.cpp
 tests/                  unit tests (check.hpp) and an in-memory MDX/MDD builder; run with ctest
+macos/                  Minedict.app: Bridge/ (Objective-C over minedict::cli), App/ (SwiftUI)
 ```
 
 ## The MDX format, briefly

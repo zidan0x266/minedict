@@ -7,6 +7,7 @@
 #            terminal front end (namespace minedict::cli)
 # tests/     unit tests
 # examples/  a toy dictionary and its terminal stylesheet
+# macos/     Minedict.app, the macOS front end (-DMINEDICT_BUILD_MACOS=ON)
 cmake_minimum_required(VERSION 3.24)
 
 project(minedict
@@ -20,6 +21,13 @@ option(MINEDICT_BUILD_TESTS "Build the unit tests" ${PROJECT_IS_TOP_LEVEL})
 option(MINEDICT_WITH_READLINE "Use GNU readline or libedit for the interactive mode" ON)
 option(MINEDICT_WITH_ICONV "Decode legacy code pages (GBK, Big5) through iconv" ON)
 option(MINEDICT_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(MINEDICT_BUILD_MACOS "Build Minedict.app, the macOS front end (needs the CLI library)" OFF)
+if(MINEDICT_BUILD_MACOS AND NOT MINEDICT_BUILD_CLI)
+    message(FATAL_ERROR "MINEDICT_BUILD_MACOS needs MINEDICT_BUILD_CLI: the app is built on minedict::cli")
+endif()
+if(MINEDICT_BUILD_MACOS)
+    enable_language(OBJCXX)  # the bridge in macos/ and its test in tests/
+endif()
 
 # ---- toolchain -------------------------------------------------------------
 include(CheckCXXSourceCompiles)
@@ -73,6 +81,9 @@ endif()
 
 # ---- the program and its tests ----------------------------------------------
 add_subdirectory(src)
+if(MINEDICT_BUILD_MACOS)
+    add_subdirectory(macos)
+endif()
 if(MINEDICT_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
