@@ -41,13 +41,13 @@ let canvas: CGFloat = 1024
 let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
 let tileRadius: CGFloat = 184
 
-/// The lens sits up and to the left so that the handle, pointing to the
-/// lower right, balances it around the tile's centre.
-let lensCenter = CGPoint(x: 468, y: 468)
-let ringOuterRadius: CGFloat = 252
-let ringWidth: CGFloat = 46
-let handleWidth: CGFloat = 78
-let handleLength: CGFloat = 176
+/// The lens is centred on the tile, its outer diameter half the canvas; the
+/// handle points to the lower right and ends inside the tile's corner.
+let lensCenter = CGPoint(x: 512, y: 512)
+let ringOuterRadius: CGFloat = 256
+let ringWidth: CGFloat = 48
+let handleWidth: CGFloat = 80
+let handleLength: CGFloat = 164
 let letteringSize: CGFloat = 232
 
 /// Apple's continuous-curvature rounded square.
