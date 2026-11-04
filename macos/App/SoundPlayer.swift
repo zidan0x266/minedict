@@ -8,6 +8,12 @@ import UniformTypeIdentifiers
 final class SoundPlayer: NSObject, AVAudioPlayerDelegate {
     static let shared = SoundPlayer()
     private var player: AVAudioPlayer?
+    /// Playback volume, 0 to 1.
+    var volume: Float = 1
+
+    var isPlaying: Bool { player?.isPlaying ?? false }
+    /// Length of the clip playing now, in seconds.
+    var duration: TimeInterval { player?.duration ?? 0 }
 
     func play(_ data: Data, name: String) {
         player?.stop()
@@ -15,6 +21,7 @@ final class SoundPlayer: NSObject, AVAudioPlayerDelegate {
         do {
             let next = try AVAudioPlayer(data: data, fileTypeHint: hint)
             next.delegate = self
+            next.volume = volume
             next.play()
             player = next
         } catch {

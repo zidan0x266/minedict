@@ -51,7 +51,7 @@ executable, the core library, its headers and a CMake package
 ## Using the dictionary
 
 ```bash
-minedict -d oxford.mdx serendipity          # render an entry
+minedict -d oxford.mdx serendipity          # render an entry (the .mdd files beside oxford.mdx come along)
 minedict -d oxford.mdx -d ~/dicts word      # several dictionaries, or a folder of .mdx (+ .mdd) files
 minedict oxford.mdx CAKE                    # bare .mdx/.mdd arguments work; keys are case-insensitive
 minedict -d oxford.mdx --raw cake           # the stored HTML, for scripts
@@ -125,7 +125,8 @@ open build/bin/Minedict.app --args --dictionary "$PWD/examples" --lookup cake
 ```
 
 Open dictionaries with File ▸ Open Dictionary… (files or a whole folder) or
-drop them on the window; the choice is kept between launches. Without one,
+drop them on the window; a `.mdx` brings the `.mdd` files beside it, and the
+choice is kept between launches. Without one,
 the app reads the same `MINEDICT_DICTS` and `~/.config/minedict/dictionaries`
 as the terminal program. The View menu switches the entry canvas between
 light (the default, which dictionary stylesheets expect), dark and the system

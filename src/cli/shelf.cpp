@@ -69,6 +69,30 @@ Result<void> Shelf::add(const std::filesystem::path& path) {
   auto dictionary = Dictionary::open(path);
   if (!dictionary) return std::unexpected(dictionary.error());
   dictionaries_.push_back(std::make_unique<Dictionary>(std::move(*dictionary)));
+
+  // A word dictionary brings the resource files that share its name
+  // (`oxford.mdd`, `oxford.1.mdd`, ...) unless they are already open.
+  if (has_extension(path, ".mdx")) {
+    const std::string stem = path.stem().string();
+    std::vector<std::filesystem::path> companions;
+    for (const auto& entry : std::filesystem::directory_iterator(path.parent_path(), ec)) {
+      if (!entry.is_regular_file(ec) || !has_extension(entry.path(), ".mdd")) continue;
+      if (!entry.path().stem().string().starts_with(stem)) continue;
+      const bool open = std::ranges::any_of(dictionaries_, [&](const auto& owned) {
+        return std::filesystem::equivalent(owned->metadata().path, entry.path(), ec);
+      });
+      if (!open) companions.push_back(entry.path());
+    }
+    std::ranges::sort(companions);
+    for (const auto& companion : companions) {
+      auto resources = Dictionary::open(companion);
+      if (!resources) {
+        problems_.push_back(std::move(resources.error().message));
+        continue;
+      }
+      dictionaries_.push_back(std::make_unique<Dictionary>(std::move(*resources)));
+    }
+  }
   return {};
 }
 

@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -151,6 +152,38 @@ TEST(dictionary, example_dictionary_end_to_end) {
   REQUIRE(!suggestions.empty());
   CHECK_EQ(suggestions[0].key, "cake");
   CHECK(d.stylesheet() != nullptr);  // examples/theme.css is picked up
+}
+
+TEST(shelf, a_word_file_brings_its_resource_files) {
+  const TempFile words(build({{"cake", "<img src=\"cake.png\">"}}), ".mdx");
+  // Resource files share the word file's name: oxford.mdd, oxford.1.mdd, ...
+  std::filesystem::path plain = words.path();
+  plain.replace_extension(".mdd");
+  std::filesystem::path numbered = words.path();
+  numbered.replace_extension(".1.mdd");
+  const auto resources = build({{"\\cake.png", "png"}}, {.kind = Kind::mdd});
+  for (const auto& file : {plain, numbered}) {
+    std::ofstream out(file, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(resources.data()), static_cast<std::streamsize>(resources.size()));
+  }
+  struct Cleanup {
+    std::vector<std::filesystem::path> files;
+    ~Cleanup() {
+      for (const auto& file : files) std::filesystem::remove(file);
+    }
+  } cleanup{{plain, numbered}};
+
+  Shelf shelf;
+  REQUIRE(shelf.add(numbered).has_value());      // opened on its own first
+  REQUIRE(shelf.add(words.path()).has_value());  // brings the other one, not this one again
+  REQUIRE_EQ(shelf.size(), 3U);
+  CHECK(shelf.problems().empty());
+  CHECK_EQ(shelf.at(0).metadata().kind, Kind::mdd);
+  CHECK_EQ(shelf.at(1).metadata().kind, Kind::mdx);
+  CHECK_EQ(shelf.at(2).metadata().kind, Kind::mdd);
+  CHECK_EQ(shelf.at(2).metadata().path, plain);
+  CHECK(shelf.at(2).resource("cake.png").has_value());
+  CHECK(shelf.lookup("cake").found());
 }
 
 TEST(shelf, aggregates_dictionaries) {

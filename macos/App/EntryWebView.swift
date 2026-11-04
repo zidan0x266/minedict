@@ -65,7 +65,7 @@ struct EntryWebView: NSViewRepresentable {
                 if url.fragment != nil, url.absoluteString.hasPrefix(base + "#") { return false }  // an anchor in it
                 show(url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent)
                 return true
-            case "entry", "bword":
+            case "entry", "bword", "d", "x", "xi", "xid", "xp":  // cross-references to other words
                 show(Self.target(of: url, scheme: scheme))
                 return true
             case ResourceSchemeHandler.soundScheme:

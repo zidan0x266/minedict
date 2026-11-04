@@ -38,9 +38,11 @@ class Shelf {
     Suggestion suggestion;
   };
 
-  /// Open a dictionary file, or every `.mdx` inside a directory. Files in a
-  /// directory that fail to open are recorded in `problems()`; the call
-  /// itself fails only when nothing could be opened.
+  /// Open a dictionary file, or every `.mdx` and `.mdd` inside a directory.
+  /// A `.mdx` file brings the `.mdd` resource files beside it that share its
+  /// name. Files that fail to open alongside others are recorded in
+  /// `problems()`; the call itself fails only when the file or directory
+  /// asked for could not be opened.
   [[nodiscard]] Result<void> add(const std::filesystem::path& path);
 
   /// Messages for the files `add` skipped.
