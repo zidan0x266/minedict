@@ -138,7 +138,10 @@ than the build machine.
 
 The app reaches the library through `macos/Bridge`, three Objective-C classes
 (`MDShelf`, `MDDictionary`, `MDEntry`) over `minedict::cli`, so it opens
-whatever the terminal program opens; `tests/test_bridge.mm` covers them.
+whatever the terminal program opens; `tests/test_bridge.mm` covers them. The
+icon is painted at build time by `macos/Icon/DrawIcon.swift` on Apple's icon
+grid (a 1024-point canvas with an 824-point rounded square) and packed with
+`iconutil`; `build/macos/icon/preview.png` shows it at full size.
 
 ## Using the library
 
@@ -187,7 +190,7 @@ src/                    the program
 ├── core/                   core implementation
 └── cli/                    front-end implementation and main.cpp
 tests/                  unit tests (check.hpp) and an in-memory MDX/MDD builder; run with ctest
-macos/                  Minedict.app: Bridge/ (Objective-C over minedict::cli), App/ (SwiftUI)
+macos/                  Minedict.app: Bridge/ (Objective-C over minedict::cli), App/ (SwiftUI), Icon/
 ```
 
 ## The MDX format, briefly

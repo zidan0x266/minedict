@@ -96,12 +96,33 @@ add_custom_command(
     VERBATIM)
 set_source_files_properties(${_swift_objects} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 
+# ---- the icon ---------------------------------------------------------------------
+# Painted at build time by Icon/DrawIcon.swift; iconutil packs the iconset into AppIcon.icns.
+set(_icon_dir "${CMAKE_CURRENT_BINARY_DIR}/icon")
+file(MAKE_DIRECTORY "${_icon_dir}")
+add_custom_command(
+    OUTPUT "${_icon_dir}/DrawIcon"
+    COMMAND ${MINEDICT_SWIFTC} -O -target "${MINEDICT_MACOS_ARCH}-apple-macosx${MINEDICT_MACOS_TARGET}"
+            -sdk "${MINEDICT_MACOS_SDK}" "${CMAKE_CURRENT_SOURCE_DIR}/Icon/DrawIcon.swift" -o "${_icon_dir}/DrawIcon"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Icon/DrawIcon.swift"
+    COMMENT "Compiling the icon painter"
+    VERBATIM)
+add_custom_command(
+    OUTPUT "${_icon_dir}/AppIcon.icns"
+    COMMAND "${_icon_dir}/DrawIcon" "${_icon_dir}"
+    COMMAND iconutil -c icns "${_icon_dir}/AppIcon.iconset" -o "${_icon_dir}/AppIcon.icns"
+    DEPENDS "${_icon_dir}/DrawIcon"
+    COMMENT "Drawing AppIcon.icns"
+    VERBATIM)
+set_source_files_properties("${_icon_dir}/AppIcon.icns" PROPERTIES GENERATED TRUE MACOSX_PACKAGE_LOCATION Resources)
+
 # ---- the bundle -------------------------------------------------------------------
-add_executable(Minedict MACOSX_BUNDLE ${_swift_objects})
+add_executable(Minedict MACOSX_BUNDLE ${_swift_objects} "${_icon_dir}/AppIcon.icns")
 set_target_properties(Minedict PROPERTIES
     OUTPUT_NAME Minedict
     LINKER_LANGUAGE OBJCXX
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+    MACOSX_BUNDLE_ICON_FILE "AppIcon"
     MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.zidan0x266.minedict"
     MACOSX_BUNDLE_BUNDLE_NAME "Minedict"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
@@ -114,9 +135,15 @@ target_link_libraries(Minedict PRIVATE minedict::bridge objc
 # dropped from the load commands.
 target_link_options(Minedict PRIVATE "-L${MINEDICT_MACOS_SDK}/usr/lib/swift" "LINKER:-rpath,/usr/lib/swift"
     "LINKER:-dead_strip_dylibs")
-add_custom_command(TARGET Minedict POST_BUILD
+# Signing comes last, once the executable and the icon are both in the bundle.
+set(_signed "${CMAKE_CURRENT_BINARY_DIR}/Minedict.signed")
+add_custom_command(
+    OUTPUT "${_signed}"
     COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Minedict>"
+    COMMAND ${CMAKE_COMMAND} -E touch "${_signed}"
+    DEPENDS Minedict "$<TARGET_FILE:Minedict>" "${_icon_dir}/AppIcon.icns"
     COMMENT "Signing Minedict.app (ad hoc)"
     VERBATIM)
+add_custom_target(minedict_app ALL DEPENDS "${_signed}")
 
 install(TARGETS Minedict BUNDLE DESTINATION Applications)
