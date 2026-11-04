@@ -136,10 +136,13 @@ target_link_libraries(Minedict PRIVATE minedict::bridge objc
 target_link_options(Minedict PRIVATE "-L${MINEDICT_MACOS_SDK}/usr/lib/swift" "LINKER:-rpath,/usr/lib/swift"
     "LINKER:-dead_strip_dylibs")
 # Signing comes last, once the executable and the icon are both in the bundle.
+# Touching the bundle afterwards changes its modification time, which is what
+# tells the Dock and Finder to drop the icon they cached for it.
 set(_signed "${CMAKE_CURRENT_BINARY_DIR}/Minedict.signed")
 add_custom_command(
     OUTPUT "${_signed}"
     COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Minedict>"
+    COMMAND touch "$<TARGET_BUNDLE_DIR:Minedict>"
     COMMAND ${CMAKE_COMMAND} -E touch "${_signed}"
     DEPENDS Minedict "$<TARGET_FILE:Minedict>" "${_icon_dir}/AppIcon.icns"
     COMMENT "Signing Minedict.app (ad hoc)"
